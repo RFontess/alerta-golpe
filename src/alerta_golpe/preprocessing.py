@@ -9,7 +9,7 @@ import unicodedata
 
 import pandas as pd
 
-MARKERS = ("<TELEFONE>", "<EMAIL>", "<NOME>", "<CPF>", "<VALOR>", "<LINK>")
+MARKERS = ("<TELEFONE>", "<EMAIL>", "<NOME>", "<CPF>", "<VALOR>", "<LINK>", "<CODIGO>")
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
@@ -27,6 +27,16 @@ _LINK = re.compile(
 _CPF = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-?\d{2}\b|\b\d{9}-\d{2}\b")
 
 _VALOR = re.compile(r"(?:R\$\s*\d[\d.,]*|\b\d[\d.,]*\s*reais\b)", re.IGNORECASE)
+
+# Roda antes do telefone: assim "pedido 1234567890" não é confundido com um número
+# de celular. Só aceita "nº" e "n°", porque "no" é preposição ("fale no 3333-4444").
+# O vão de até três palavras minúsculas cobre "código de segurança 123456" e
+# "código é 123456"; minúsculas só, para não engolir um nome próprio no meio.
+_CODIGO = re.compile(
+    r"((?i:pedido|protocolo|c[óo]digo|n\.?[º°]))"
+    r"((?:\s+[a-zà-ÿ]{1,12}){0,3}[\s:.-]*)"
+    r"(\d[\d.\-/]*)"
+)
 
 # A alternativa de dez ou onze dígitos seguidos existe para não deixar número
 # nenhum em claro; o custo é marcar como telefone algum código numérico longo.
@@ -99,11 +109,12 @@ def _replace_name(match: re.Match[str]) -> str:
 
 
 def anonymize(text: str) -> str:
-    """Troca telefones, e-mails, nomes, CPFs, valores e links pelos marcadores."""
+    """Troca telefones, e-mails, nomes, CPFs, valores, links e códigos pelos marcadores."""
     text = _EMAIL.sub("<EMAIL>", text)
     text = _LINK.sub("<LINK>", text)
     text = _CPF.sub("<CPF>", text)
     text = _VALOR.sub("<VALOR>", text)
+    text = _CODIGO.sub(r"\1\2<CODIGO>", text)
     text = _TELEFONE.sub("<TELEFONE>", text)
     return _NOME.sub(_replace_name, text)
 
