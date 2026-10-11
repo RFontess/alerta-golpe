@@ -24,7 +24,9 @@ _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
 # Golpes costumam encurtar o link ou omitir o "http", por isso a lista de domínios.
 _LINK = re.compile(
-    r"(?:https?://\S+"
+    # O espaço depois do esquema aparece em golpe real ("https:// rebrand.ly/x") e
+    # o \S* deixa o esquema sozinho também virar marcador, sem sobrar texto cru.
+    r"(?:https?://[ \t]*\S*"
     r"|www\.\S+"
     r"|\b[\w-]+(?:\.[\w-]+)*\.(?:com|br|net|org|gov|info|xyz|top|link|site|app|io|me|co"
     r"|ly|gl|tk|cc|online|shop|store|digital|vip|click)(?:\.[a-z]{2})?(?:/\S*)?)",

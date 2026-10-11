@@ -48,6 +48,8 @@ def test_anonimiza_link_com_e_sem_http(texto, esperado):
     ("texto", "esperado"),
     [
         ("acesse bit.ly/pix-agora, agora", "acesse <LINK>, agora"),
+        # Golpe real do BB vinha com espaço depois do esquema.
+        ("troque em: https:// pontos.example/bb", "troque em: <LINK>"),
         ("acesse www.banco-falso.com.", "acesse <LINK>."),
         ("acesse https://banco-falso.com/entrar!", "acesse <LINK>!"),
     ],
