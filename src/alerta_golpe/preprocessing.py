@@ -48,6 +48,16 @@ _TELEFONE = re.compile(
     r"|\b9?\d{4}[\s.-]\d{4}\b)"
 )
 
+# Só as formas com pontuação, DDD entre parênteses, 0800 ou +55: são as que dão
+# para reconhecer como telefone sem ambiguidade, mesmo depois de "código".
+_TELEFONE_FORMATADO = re.compile(
+    r"(?:0800[\s.-]?\d{3}[\s.-]?\d{4}"
+    r"|\+?55[\s.-]?\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}"
+    r"|\(\d{2}\)[\s.-]?\s*9?\d{4}[\s.-]?\d{4}"
+    r"|\d{2}[\s.-]\s*9?\d{4}[\s.-]?\d{4}"
+    r"|9?\d{4}[\s.-]\d{4})"
+)
+
 # Regra deliberadamente estreita: só o nome logo depois de uma saudação ou pronome
 # de tratamento. Nome no meio da frase ou sem maiúscula não é detectado.
 _NOME = re.compile(
@@ -85,9 +95,42 @@ _NOT_A_NAME = frozenset(
     }
 )
 
+# Marca imitada no lugar do nome é sinal de golpe, então o nome da instituição
+# fica no texto. "INSS" e "Detran" em maiúsculas nem chegam aqui: a regra de nome
+# exige inicial maiúscula seguida de minúsculas.
+_INSTITUTIONS = frozenset(
+    {
+        "sicredi",
+        "itau",
+        "bradesco",
+        "santander",
+        "caixa",
+        "banco do brasil",
+        "nubank",
+        "inter",
+        "correios",
+        "mercado livre",
+        "shopee",
+        "amazon",
+        "serasa",
+        "receita federal",
+        "inss",
+        "detran",
+    }
+)
+
+_MAX_INSTITUTION_WORDS = 3
+
 _MARKER = re.compile("|".join(marker.lower() for marker in MARKERS))
 
 _WHITESPACE = re.compile(r"\s+")
+
+
+def _replace_link(match: re.Match[str]) -> str:
+    # A pontuação no fim da frase não faz parte do endereço: "acesse site.com/x," .
+    link = match.group(0)
+    sem_pontuacao = link.rstrip(".,;:!?)]}")
+    return "<LINK>" + link[len(sem_pontuacao) :]
 
 
 def _strip_accents(text: str) -> str:
@@ -95,12 +138,29 @@ def _strip_accents(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+def _lookup_key(text: str) -> str:
+    return _strip_accents(text).lower()
+
+
+def _count_not_names(words: list[str]) -> int:
+    """Quantas palavras do começo são tratamento genérico ou nome de instituição."""
+    index = 0
+    while index < len(words):
+        for size in range(min(_MAX_INSTITUTION_WORDS, len(words) - index), 0, -1):
+            if _lookup_key(" ".join(words[index : index + size])) in _INSTITUTIONS:
+                index += size
+                break
+        else:
+            if _lookup_key(words[index]) not in _NOT_A_NAME:
+                break
+            index += 1
+    return index
+
+
 def _replace_name(match: re.Match[str]) -> str:
     greeting, separator, name = match.group(1), match.group(2), match.group(3)
     words = name.split()
-    kept = 0
-    while kept < len(words) and _strip_accents(words[kept]).lower() in _NOT_A_NAME:
-        kept += 1
+    kept = _count_not_names(words)
     if kept == len(words):
         return match.group(0)
     # "Prezado Cliente João" guarda o tratamento genérico e anonimiza o resto.
@@ -108,13 +168,23 @@ def _replace_name(match: re.Match[str]) -> str:
     return f"{greeting}{separator}{prefix} <NOME>" if prefix else f"{greeting}{separator}<NOME>"
 
 
+def _replace_code(match: re.Match[str]) -> str:
+    keyword, gap, number = match.group(1), match.group(2), match.group(3)
+    telefone = _TELEFONE_FORMATADO.match(match.string, match.start(3))
+    # "código que enviamos para 11 98765-4321": o número começa como código, mas o
+    # trecho inteiro é um telefone. Deixa passar para a regra de telefone.
+    if telefone and telefone.end() - match.start(3) >= len(number):
+        return match.group(0)
+    return f"{keyword}{gap}<CODIGO>"
+
+
 def anonymize(text: str) -> str:
     """Troca telefones, e-mails, nomes, CPFs, valores, links e códigos pelos marcadores."""
     text = _EMAIL.sub("<EMAIL>", text)
-    text = _LINK.sub("<LINK>", text)
+    text = _LINK.sub(_replace_link, text)
     text = _CPF.sub("<CPF>", text)
     text = _VALOR.sub("<VALOR>", text)
-    text = _CODIGO.sub(r"\1\2<CODIGO>", text)
+    text = _CODIGO.sub(_replace_code, text)
     text = _TELEFONE.sub("<TELEFONE>", text)
     return _NOME.sub(_replace_name, text)
 
