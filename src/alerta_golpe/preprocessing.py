@@ -9,7 +9,16 @@ import unicodedata
 
 import pandas as pd
 
-MARKERS = ("<TELEFONE>", "<EMAIL>", "<NOME>", "<CPF>", "<VALOR>", "<LINK>", "<CODIGO>")
+MARKERS = (
+    "<TELEFONE>",
+    "<EMAIL>",
+    "<NOME>",
+    "<CPF>",
+    "<CNPJ>",
+    "<VALOR>",
+    "<LINK>",
+    "<CODIGO>",
+)
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
@@ -21,6 +30,12 @@ _LINK = re.compile(
     r"|ly|gl|tk|cc|online|shop|store|digital|vip|click)(?:\.[a-z]{2})?(?:/\S*)?)",
     re.IGNORECASE,
 )
+
+# Golpe de Pix costuma mandar pagar para o CNPJ de um microempreendedor que não
+# tem nada a ver com a fraude, então o número é dado de uma pessoa lesada.
+# Roda antes do telefone e aceita de doze a quatorze dígitos: as mensagens reais
+# aparecem com dígito faltando. Doze dígitos ou mais não colidem com telefone.
+_CNPJ = re.compile(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-?\d{2}\b|\b\d{12,14}\b")
 
 # Exige pontuação: onze dígitos seguidos são ambíguos com celular e DDD, e nesse
 # caso viram <TELEFONE> (continuam anonimizados, só com o marcador errado).
@@ -179,9 +194,10 @@ def _replace_code(match: re.Match[str]) -> str:
 
 
 def anonymize(text: str) -> str:
-    """Troca telefones, e-mails, nomes, CPFs, valores, links e códigos pelos marcadores."""
+    """Troca telefones, e-mails, nomes, documentos, valores, links e códigos pelos marcadores."""
     text = _EMAIL.sub("<EMAIL>", text)
     text = _LINK.sub(_replace_link, text)
+    text = _CNPJ.sub("<CNPJ>", text)
     text = _CPF.sub("<CPF>", text)
     text = _VALOR.sub("<VALOR>", text)
     text = _CODIGO.sub(_replace_code, text)

@@ -67,6 +67,23 @@ def test_anonimiza_cpf(texto, esperado):
     assert anonymize(texto) == esperado
 
 
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("pague via Pix CNPJ 12.345.678/0001-99", "pague via Pix CNPJ <CNPJ>"),
+        ("pague via Pix CNPJ 12345678000199", "pague via Pix CNPJ <CNPJ>"),
+        # Mensagem real da Vivo, publicada com um dígito faltando no CNPJ.
+        ("pague via Pix CNPJ 3717195000142", "pague via Pix CNPJ <CNPJ>"),
+    ],
+)
+def test_anonimiza_cnpj(texto, esperado):
+    assert anonymize(texto) == esperado
+
+
+def test_cnpj_nao_rouba_o_telefone():
+    assert anonymize("ligue 11987654321 agora") == "ligue <TELEFONE> agora"
+
+
 def test_cpf_sem_pontuacao_vira_telefone_mas_nao_fica_exposto():
     # Onze dígitos seguidos são ambíguos com celular e DDD: o marcador pode sair
     # errado, mas o número nunca fica em claro.
