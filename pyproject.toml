@@ -2,7 +2,7 @@
 name = "alerta-golpe"
 version = "0.1.0"
 description = "Protótipo que estima a chance de uma mensagem ser golpe financeiro"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -13,7 +13,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
