@@ -159,17 +159,32 @@ def test_nome_de_instituicao_nao_e_nome_de_pessoa(texto):
     assert anonymize(texto) == texto
 
 
-def test_nome_depois_de_tratamento_generico_ainda_e_anonimizado():
-    assert anonymize("Prezado Cliente João, confirme") == "Prezado Cliente <NOME>, confirme"
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Prezado Cliente João, confirme", "Prezado Cliente <NOME>, confirme"),
+        ("Prezado Cliente Sicredi João", "Prezado Cliente Sicredi <NOME>"),
+        ("Prezada Associada Maria Souza", "Prezada Associada <NOME>"),
+    ],
+)
+def test_nome_depois_de_tratamento_ou_instituicao_ainda_e_anonimizado(texto, esperado):
+    assert anonymize(texto) == esperado
 
 
-def test_nome_depois_de_instituicao_ainda_e_anonimizado():
-    assert anonymize("Prezado Cliente Sicredi João") == "Prezado Cliente Sicredi <NOME>"
-
-
-def test_nome_no_meio_da_frase_nao_e_detectado():
-    # Limitação conhecida da regra: só nome logo depois de saudação ou tratamento.
-    assert anonymize("a conta de Maria foi bloqueada") == "a conta de Maria foi bloqueada"
+@pytest.mark.xfail(
+    strict=True,
+    reason="limitação conhecida: a regra de nome só olha depois de saudação ou "
+    "pronome de tratamento, então nome no meio da frase não é detectado",
+)
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("a conta de Maria foi bloqueada", "a conta de <NOME> foi bloqueada"),
+        ("fale com Carlos Souza sobre o Pix", "fale com <NOME> sobre o Pix"),
+    ],
+)
+def test_nome_no_meio_da_frase(texto, esperado):
+    assert anonymize(texto) == esperado
 
 
 @pytest.mark.parametrize(
@@ -181,15 +196,6 @@ def test_nome_no_meio_da_frase_nao_e_detectado():
         ("Codigo: 987654", "Codigo: <CODIGO>"),
         ("nº 445566 confirmado", "nº <CODIGO> confirmado"),
         ("n.º 445566 confirmado", "n.º <CODIGO> confirmado"),
-    ],
-)
-def test_anonimiza_codigo(texto, esperado):
-    assert anonymize(texto) == esperado
-
-
-@pytest.mark.parametrize(
-    ("texto", "esperado"),
-    [
         ("seu código é 123456", "seu código é <CODIGO>"),
         (
             "codigo de seguranca 123456 nao compartilhe",
@@ -197,7 +203,7 @@ def test_anonimiza_codigo(texto, esperado):
         ),
     ],
 )
-def test_anonimiza_codigo_com_palavras_no_meio(texto, esperado):
+def test_anonimiza_codigo(texto, esperado):
     assert anonymize(texto) == esperado
 
 
@@ -213,14 +219,12 @@ def test_anonimiza_codigo_com_palavras_no_meio(texto, esperado):
             "Digite o código que enviamos para <TELEFONE>",
         ),
         ("codigo enviado para 98765-4321", "codigo enviado para <TELEFONE>"),
+        # "no" é preposição, não o ordinal "nº": o número aqui é telefone.
+        ("Fale no 3333-4444", "Fale no <TELEFONE>"),
     ],
 )
 def test_codigo_nao_quebra_telefone(texto, esperado):
     assert anonymize(texto) == esperado
-
-
-def test_no_como_preposicao_nao_vira_codigo():
-    assert anonymize("Fale no 3333-4444") == "Fale no <TELEFONE>"
 
 
 def test_anonimiza_varios_marcadores_na_mesma_mensagem():
@@ -248,8 +252,16 @@ def test_texto_sem_dado_pessoal_fica_igual(texto):
     assert anonymize(texto) == texto
 
 
-def test_normaliza_caixa_acento_e_espaco():
-    assert normalize_text("  Seu   ÚLTIMO  aviso  ") == "seu ultimo aviso"
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("  Seu   ÚLTIMO  aviso  ", "seu ultimo aviso"),
+        ("SUA CONTA SERÁ BLOQUEADA", "sua conta sera bloqueada"),
+        ("ola mundo", "ola mundo"),
+    ],
+)
+def test_normaliza_caixa_acento_e_espaco(texto, esperado):
+    assert normalize_text(texto) == esperado
 
 
 def test_normalizacao_preserva_marcadores_em_maiusculas():
