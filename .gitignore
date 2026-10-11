@@ -18,3 +18,7 @@ SPEC.md
 CLAUDE.md
 .claude/
 _estudo/
+
+# Datasets externos sem licença aberta e dados privados: nunca entram no Git
+data/external/
+data/private/
