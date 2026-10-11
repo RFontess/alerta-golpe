@@ -45,15 +45,24 @@ _CPF = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-?\d{2}\b|\b\d{9}-\d{2}\b")
 
 _VALOR = re.compile(r"(?:R\$\s*\d[\d.,]*|\b\d[\d.,]*\s*reais\b)", re.IGNORECASE)
 
-# Roda antes do telefone: assim "pedido 1234567890" não é confundido com um número
-# de celular. Só aceita "nº" e "n°", porque "no" é preposição ("fale no 3333-4444").
-# O vão de até três palavras minúsculas cobre "código de segurança 123456" e
-# "código é 123456"; minúsculas só, para não engolir um nome próprio no meio.
+# Roda antes do CNPJ e do telefone: rastreio e pedido também têm doze ou treze
+# dígitos ("Envio padrão: 3320077642132", "pedido nº2418820753121") e cairiam na
+# regra de CNPJ ou de celular. Só aceita "nº" e "n°", porque "no" é preposição
+# ("fale no 3333-4444"). O vão de até seis palavras minúsculas cobre o que as
+# notificações reais escrevem: "código de uso único é: 893530" e "código de
+# verificação temporário para continuar: 274096". Minúsculas só, para não engolir
+# um nome próprio no meio. O código aceita letra depois do primeiro dígito, por
+# causa de identificador misto como 260816G0DEDR81.
 _CODIGO = re.compile(
-    r"((?i:pedido|protocolo|c[óo]digo|n\.?[º°]))"
-    r"((?:\s+[a-zà-ÿ]{1,12}){0,3}[\s:.-]*)"
-    r"(\d[\d.\-/]*)"
+    r"((?i:pedido|protocolo|c[óo]digo|rastre(?:io|amento)|envio|n\.?[º°]))"
+    r"((?:\s+[a-zà-ÿ]{1,12}){0,6}[\s:.-]*)"
+    # O prefixo de letras cobre o rastreio dos Correios, do tipo BR123456789BR.
+    r"([A-Za-z]{0,3}\d[\w.\-/]*)"
 )
+
+# Código de pedido de loja vem com cerquilha e mistura letra e número, sem palavra
+# que o anuncie: "PAGAMENTO APROVADO #260816G0DEDR81".
+_CODIGO_COM_CERQUILHA = re.compile(r"#(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,}\b")
 
 # A alternativa de dez ou onze dígitos seguidos existe para não deixar número
 # nenhum em claro; o custo é marcar como telefone algum código numérico longo.
@@ -199,10 +208,12 @@ def anonymize(text: str) -> str:
     """Troca telefones, e-mails, nomes, documentos, valores, links e códigos pelos marcadores."""
     text = _EMAIL.sub("<EMAIL>", text)
     text = _LINK.sub(_replace_link, text)
+    # Valor antes de código: o "R$" protege a quantia de "envio de R$ 19,90".
+    text = _VALOR.sub("<VALOR>", text)
+    text = _CODIGO_COM_CERQUILHA.sub("<CODIGO>", text)
+    text = _CODIGO.sub(_replace_code, text)
     text = _CNPJ.sub("<CNPJ>", text)
     text = _CPF.sub("<CPF>", text)
-    text = _VALOR.sub("<VALOR>", text)
-    text = _CODIGO.sub(_replace_code, text)
     text = _TELEFONE.sub("<TELEFONE>", text)
     return _NOME.sub(_replace_name, text)
 

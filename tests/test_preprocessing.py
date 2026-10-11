@@ -216,6 +216,20 @@ def test_nome_no_meio_da_frase(texto, esperado):
         ("nº 445566 confirmado", "nº <CODIGO> confirmado"),
         ("n.º 445566 confirmado", "n.º <CODIGO> confirmado"),
         ("seu código é 123456", "seu código é <CODIGO>"),
+        # Notificações reais põem até cinco palavras entre a palavra e o número.
+        ("Seu código de uso único é: 893530", "Seu código de uso único é: <CODIGO>"),
+        (
+            "Código de verificação temporário para continuar: 274096",
+            "Código de verificação temporário para continuar: <CODIGO>",
+        ),
+        # Treze dígitos cairiam na regra de CNPJ se o código não rodasse antes.
+        ("Envio padrão: 3320077642132", "Envio padrão: <CODIGO>"),
+        ("Seu pedido nº2418820753121 foi cancelado", "Seu pedido nº<CODIGO> foi cancelado"),
+        ("informações de rastreio: BR123456789BR", "informações de rastreio: <CODIGO>"),
+        ("código de rastreamento AA987654321BR", "código de rastreamento <CODIGO>"),
+        # Código de loja com cerquilha, letra e número, sem palavra que o anuncie.
+        ("PAGAMENTO APROVADO #260816G0DEDR81 ok", "PAGAMENTO APROVADO <CODIGO> ok"),
+        ("PAGAMENTO APROVADO #260618CN6PAQWH ok", "PAGAMENTO APROVADO <CODIGO> ok"),
         (
             "codigo de seguranca 123456 nao compartilhe",
             "codigo de seguranca <CODIGO> nao compartilhe",
@@ -223,6 +237,18 @@ def test_nome_no_meio_da_frase(texto, esperado):
     ],
 )
 def test_anonimiza_codigo(texto, esperado):
+    assert anonymize(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Envio padrão: R$ 19,90", "Envio padrão: <VALOR>"),
+        ("envio de 500 reais para você", "envio de <VALOR> para você"),
+    ],
+)
+def test_valor_vence_o_codigo_quando_tem_real(texto, esperado):
+    # "envio" é gatilho de código, mas aqui o número é quantia, não identificador.
     assert anonymize(texto) == esperado
 
 
