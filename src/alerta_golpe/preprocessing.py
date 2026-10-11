@@ -51,18 +51,22 @@ _VALOR = re.compile(r"(?:R\$\s*\d[\d.,]*|\b\d[\d.,]*\s*reais\b)", re.IGNORECASE)
 # ("fale no 3333-4444"). O vão de até seis palavras minúsculas cobre o que as
 # notificações reais escrevem: "código de uso único é: 893530" e "código de
 # verificação temporário para continuar: 274096". Minúsculas só, para não engolir
-# um nome próprio no meio. O código aceita letra depois do primeiro dígito, por
-# causa de identificador misto como 260816G0DEDR81.
+# um nome próprio no meio. Exige quatro dígitos: código de verificação tem de
+# quatro a oito, e com menos o vão largo pegaria número curto de texto comum
+# ("válido por 5 minutos").
 _CODIGO = re.compile(
-    r"((?i:pedido|protocolo|c[óo]digo|rastre(?:io|amento)|envio|n\.?[º°]))"
+    r"((?i:pedidos?(?:\(s\))?|protocolo|c[óo]digo|rastre(?:io|amento)|envio|n\.?[º°]))"
     r"((?:\s+[a-zà-ÿ]{1,12}){0,6}[\s:.-]*)"
     # O prefixo de letras cobre o rastreio dos Correios, do tipo BR123456789BR.
-    r"([A-Za-z]{0,3}\d[\w.\-/]*)"
+    r"([A-Za-z]{0,3}\d{4}[\w.\-/]*)"
 )
 
-# Código de pedido de loja vem com cerquilha e mistura letra e número, sem palavra
-# que o anuncie: "PAGAMENTO APROVADO #260816G0DEDR81".
+# Código de pedido de loja vem com cerquilha: "PAGAMENTO APROVADO #260816G0DEDR81".
 _CODIGO_COM_CERQUILHA = re.compile(r"#(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,}\b")
+
+# O mesmo código reaparece sem cerquilha e sem palavra que o anuncie. Oito
+# caracteres misturando letra e número: nenhuma palavra comum tem esse formato.
+_CODIGO_MISTO = re.compile(r"\b(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{8,}\b")
 
 # A alternativa de dez ou onze dígitos seguidos existe para não deixar número
 # nenhum em claro; o custo é marcar como telefone algum código numérico longo.
@@ -159,6 +163,13 @@ def _replace_link(match: re.Match[str]) -> str:
     return "<LINK>" + link[len(sem_pontuacao) :]
 
 
+def _replace_value(match: re.Match[str]) -> str:
+    # "R$ 450. E o melhor": o ponto encerra a frase, não faz parte da quantia.
+    valor = match.group(0)
+    sem_pontuacao = valor.rstrip(".,;:!?")
+    return "<VALOR>" + valor[len(sem_pontuacao) :]
+
+
 def _strip_accents(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text)
     return "".join(c for c in decomposed if not unicodedata.combining(c))
@@ -209,9 +220,10 @@ def anonymize(text: str) -> str:
     text = _EMAIL.sub("<EMAIL>", text)
     text = _LINK.sub(_replace_link, text)
     # Valor antes de código: o "R$" protege a quantia de "envio de R$ 19,90".
-    text = _VALOR.sub("<VALOR>", text)
+    text = _VALOR.sub(_replace_value, text)
     text = _CODIGO_COM_CERQUILHA.sub("<CODIGO>", text)
     text = _CODIGO.sub(_replace_code, text)
+    text = _CODIGO_MISTO.sub("<CODIGO>", text)
     text = _CNPJ.sub("<CNPJ>", text)
     text = _CPF.sub("<CPF>", text)
     text = _TELEFONE.sub("<TELEFONE>", text)

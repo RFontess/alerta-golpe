@@ -230,6 +230,11 @@ def test_nome_no_meio_da_frase(texto, esperado):
         # Código de loja com cerquilha, letra e número, sem palavra que o anuncie.
         ("PAGAMENTO APROVADO #260816G0DEDR81 ok", "PAGAMENTO APROVADO <CODIGO> ok"),
         ("PAGAMENTO APROVADO #260618CN6PAQWH ok", "PAGAMENTO APROVADO <CODIGO> ok"),
+        # O mesmo código reaparece sem cerquilha, depois de "pedido(s)".
+        (
+            "O pagamento do(s) pedido(s) 260816G0DEDR81 foi aprovado",
+            "O pagamento do(s) pedido(s) <CODIGO> foi aprovado",
+        ),
         (
             "codigo de seguranca 123456 nao compartilhe",
             "codigo de seguranca <CODIGO> nao compartilhe",
@@ -237,6 +242,33 @@ def test_nome_no_meio_da_frase(texto, esperado):
     ],
 )
 def test_anonimiza_codigo(texto, esperado):
+    assert anonymize(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        # Número de até três dígitos não é código: "válido por 5 minutos" é texto.
+        ("Este código é válido por 5 minutos", "Este código é válido por 5 minutos"),
+        (
+            "Código de ativação: 162062 Este código é válido por 5 minutos",
+            "Código de ativação: <CODIGO> Este código é válido por 5 minutos",
+        ),
+        ("o prazo é de 30 minutos", "o prazo é de 30 minutos"),
+    ],
+)
+def test_numero_curto_nao_e_codigo(texto, esperado):
+    assert anonymize(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Aproveite R$ 450. E o melhor: sem juros", "Aproveite <VALOR>. E o melhor: sem juros"),
+        ("desconto de R$ 19,90, aproveite", "desconto de <VALOR>, aproveite"),
+    ],
+)
+def test_valor_nao_engole_a_pontuacao_da_frase(texto, esperado):
     assert anonymize(texto) == esperado
 
 
