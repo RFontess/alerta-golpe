@@ -1,6 +1,6 @@
 # Alerta Golpe
 
-[![Abrir o app](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](#demonstração)
+[![Abrir o app](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://alerta-golpe.streamlit.app)
 [![CI](https://github.com/RFontess/alerta-golpe/actions/workflows/ci.yml/badge.svg)](https://github.com/RFontess/alerta-golpe/actions/workflows/ci.yml)
 [![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)](LICENSE)
 
@@ -20,9 +20,9 @@ linguagem simples. O público são pessoas idosas e quem as ajuda.
 
 ## Demonstração
 
-Ainda não publicado. Para ver o app funcionando agora, rode local com os comandos de
-[Como rodar localmente](#como-rodar-localmente): a tela traz três exemplos prontos, um de
-cada nível, que preenchem a caixa com um clique.
+O app está publicado em <https://alerta-golpe.streamlit.app>. Cole uma mensagem na caixa,
+ou clique num dos três exemplos prontos, um de cada nível, que preenchem a caixa de uma
+vez.
 
 ## Em resumo
 
