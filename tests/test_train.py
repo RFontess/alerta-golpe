@@ -1,17 +1,33 @@
 import pandas as pd
 import pytest
 
+from alerta_golpe.baseline import SIGNALS
 from alerta_golpe.train import (
     APP_THRESHOLD,
+    MAX_FALSE_POSITIVES,
     THRESHOLDS,
+    build_hybrid_pipeline,
     build_pipeline,
+    choose_for_app,
     drop_link_marker,
     evaluate,
     out_of_fold_predictions,
     recall_by_origin,
+    signal_features,
     threshold_table,
     unseen_types_recognized,
 )
+
+
+def _candidato(nome, alarmes_falsos, golpes_de_sms, recall=0.5, f1=0.5):
+    return {
+        "configuracao": nome,
+        "alarmes_falsos": alarmes_falsos,
+        "golpes_de_sms": golpes_de_sms,
+        "golpes_de_sms_total": 17,
+        "recall": recall,
+        "f1": f1,
+    }
 
 
 @pytest.fixture
@@ -109,6 +125,54 @@ def test_tipos_nao_vistos_conta_por_grupo(mensagens):
     assert tipos["tipos"] == 3
     assert tipos["reconhecidos"] == 3
     assert tipos["nao_reconhecidos"] == []
+
+
+def test_sinais_do_baseline_viram_colunas_binarias():
+    matriz = signal_features(["sua conta sera bloqueada hoje <LINK>", "oi, tudo bem?"])
+    assert matriz.shape == (2, len(SIGNALS))
+    assert set(matriz.flatten()) <= {0.0, 1.0}
+    assert matriz[0].sum() > matriz[1].sum()
+
+
+def test_hibrido_usa_tfidf_mais_os_sinais(mensagens):
+    pipeline = build_hybrid_pipeline().fit(mensagens["texto"], mensagens["rotulo"])
+    atributos = pipeline.named_steps["atributos"]
+    n_tfidf = len(atributos.transformer_list[0][1].get_feature_names_out())
+    assert atributos.transform(mensagens["texto"]).shape[1] == n_tfidf + len(SIGNALS)
+
+
+def test_criterio_descarta_quem_passa_do_limite_de_alarme_falso():
+    candidatos = [
+        _candidato("pega tudo mas alarma", MAX_FALSE_POSITIVES + 1, 17),
+        _candidato("comportada", 5, 10),
+    ]
+    escolha = choose_for_app(candidatos)
+    assert escolha["escolhida"] == "comportada"
+    assert escolha["fora_do_limite"] == ["pega tudo mas alarma"]
+
+
+def test_criterio_prefere_mais_golpes_de_sms():
+    candidatos = [_candidato("a", 9, 14), _candidato("b", 2, 5)]
+    assert choose_for_app(candidatos)["escolhida"] == "a"
+
+
+def test_criterio_desempata_por_recall_e_depois_f1():
+    candidatos = [
+        _candidato("recall menor", 3, 11, recall=0.70, f1=0.90),
+        _candidato("recall maior", 3, 11, recall=0.80, f1=0.60),
+    ]
+    assert choose_for_app(candidatos)["escolhida"] == "recall maior"
+
+    empatados = [
+        _candidato("f1 menor", 3, 11, recall=0.80, f1=0.60),
+        _candidato("f1 maior", 3, 11, recall=0.80, f1=0.70),
+    ]
+    assert choose_for_app(empatados)["escolhida"] == "f1 maior"
+
+
+def test_sem_nenhuma_configuracao_elegivel_fica_o_baseline():
+    candidatos = [_candidato("alarmista", MAX_FALSE_POSITIVES + 5, 17)]
+    assert choose_for_app(candidatos)["escolhida"] == "baseline"
 
 
 def test_tabela_de_limiares_cobre_todos_os_limiares(mensagens):

@@ -177,6 +177,197 @@
       ]
     }
   },
+  "hibrido": {
+    "precisao": 0.84,
+    "recall": 0.737,
+    "f1": 0.785,
+    "contagens": {
+      "vp": 42,
+      "fp": 8,
+      "fn": 15,
+      "vn": 34
+    },
+    "mensagens": 99,
+    "por_grupo": {
+      "golpe": {
+        "grupos": 26,
+        "acerto_medio": 0.788,
+        "desvio": 0.351,
+        "grupos_sem_nenhum_acerto": 3
+      },
+      "legitima": {
+        "grupos": 29,
+        "acerto_medio": 0.793,
+        "desvio": 0.383,
+        "grupos_sem_nenhum_acerto": 5
+      }
+    },
+    "recall_por_origem": {
+      "SMS e alertas": {
+        "reconhecidos": 11,
+        "golpes": 17,
+        "recall": 0.647
+      },
+      "anuncio de grupo": {
+        "reconhecidos": 31,
+        "golpes": 40,
+        "recall": 0.775
+      }
+    },
+    "tipos_nao_vistos": {
+      "tipos": 26,
+      "reconhecidos": 21,
+      "reconhecidos_por_inteiro": 18,
+      "nao_reconhecidos": [
+        "boleto-com-desconto",
+        "correios-pedido-retido",
+        "emprestimo-para-negativado",
+        "inss-indenizacao-lista",
+        "notificacao-extrajudicial-0800"
+      ]
+    }
+  },
+  "combinacao": {
+    "precisao": 0.775,
+    "recall": 0.965,
+    "f1": 0.859,
+    "contagens": {
+      "vp": 55,
+      "fp": 16,
+      "fn": 2,
+      "vn": 26
+    },
+    "mensagens": 99,
+    "por_grupo": {
+      "golpe": {
+        "grupos": 26,
+        "acerto_medio": 0.968,
+        "desvio": 0.113,
+        "grupos_sem_nenhum_acerto": 0
+      },
+      "legitima": {
+        "grupos": 29,
+        "acerto_medio": 0.621,
+        "desvio": 0.467,
+        "grupos_sem_nenhum_acerto": 10
+      }
+    },
+    "recall_por_origem": {
+      "SMS e alertas": {
+        "reconhecidos": 16,
+        "golpes": 17,
+        "recall": 0.941
+      },
+      "anuncio de grupo": {
+        "reconhecidos": 39,
+        "golpes": 40,
+        "recall": 0.975
+      }
+    },
+    "tipos_nao_vistos": {
+      "tipos": 26,
+      "reconhecidos": 26,
+      "reconhecidos_por_inteiro": 24,
+      "nao_reconhecidos": []
+    }
+  },
+  "configuracoes_testadas": [
+    {
+      "configuracao": "baseline",
+      "precisao": 0.85,
+      "recall": 0.895,
+      "f1": 0.872,
+      "alarmes_falsos": 9,
+      "golpes_de_sms": 14,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 24,
+      "tipos": 26
+    },
+    {
+      "configuracao": "modelo 0,50",
+      "precisao": 0.947,
+      "recall": 0.632,
+      "f1": 0.758,
+      "alarmes_falsos": 2,
+      "golpes_de_sms": 5,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 12,
+      "tipos": 26
+    },
+    {
+      "configuracao": "modelo 0,45",
+      "precisao": 0.818,
+      "recall": 0.789,
+      "f1": 0.804,
+      "alarmes_falsos": 10,
+      "golpes_de_sms": 11,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 19,
+      "tipos": 26
+    },
+    {
+      "configuracao": "modelo sem LINK 0,50",
+      "precisao": 0.944,
+      "recall": 0.596,
+      "f1": 0.731,
+      "alarmes_falsos": 2,
+      "golpes_de_sms": 3,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 10,
+      "tipos": 26
+    },
+    {
+      "configuracao": "hibrido 0,50",
+      "precisao": 0.854,
+      "recall": 0.719,
+      "f1": 0.781,
+      "alarmes_falsos": 7,
+      "golpes_de_sms": 11,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 20,
+      "tipos": 26
+    },
+    {
+      "configuracao": "hibrido 0,45",
+      "precisao": 0.84,
+      "recall": 0.737,
+      "f1": 0.785,
+      "alarmes_falsos": 8,
+      "golpes_de_sms": 11,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 21,
+      "tipos": 26
+    },
+    {
+      "configuracao": "baseline ou modelo 0,45",
+      "precisao": 0.775,
+      "recall": 0.965,
+      "f1": 0.859,
+      "alarmes_falsos": 16,
+      "golpes_de_sms": 16,
+      "golpes_de_sms_total": 17,
+      "tipos_reconhecidos": 26,
+      "tipos": 26
+    }
+  ],
+  "escolha_do_app": {
+    "criterio": "no máximo 10 alarmes falsos; entre essas, mais golpes de SMS detectados; empate pelo recall geral e depois pelo F1",
+    "criterio_definido": "antes de medir as configurações",
+    "elegiveis": [
+      "baseline",
+      "modelo 0,50",
+      "modelo 0,45",
+      "modelo sem LINK 0,50",
+      "hibrido 0,50",
+      "hibrido 0,45"
+    ],
+    "fora_do_limite": [
+      "baseline ou modelo 0,45"
+    ],
+    "escolhida": "baseline",
+    "golpes_de_sms": "14 de 17",
+    "alarmes_falsos": 9
+  },
   "limiares_fora_da_dobra": [
     {
       "limiar": 0.3,

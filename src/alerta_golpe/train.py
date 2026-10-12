@@ -26,14 +26,18 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.preprocessing import FunctionTransformer
 
+from alerta_golpe.baseline import SIGNALS
 from alerta_golpe.baseline import THRESHOLD as BASELINE_THRESHOLD
 from alerta_golpe.baseline import predict as baseline_predict
+from alerta_golpe.baseline import signals as baseline_signals
 from alerta_golpe.dataset import load_messages
 from alerta_golpe.paths import REPORTS_DIR
 from alerta_golpe.preprocessing import normalize_text
@@ -82,14 +86,62 @@ def build_pipeline(drop_link: bool = False) -> Pipeline:
     )
 
 
-def out_of_fold_predictions(messages: pd.DataFrame, drop_link: bool = False) -> pd.DataFrame:
+_SIGNAL_NAMES = tuple(nome for nome, _ in SIGNALS)
+
+
+def signal_features(textos) -> np.ndarray:
+    """Os sinais do baseline como colunas binárias, para o modelo híbrido."""
+    disparos = [set(baseline_signals(texto)) for texto in textos]
+    return np.array(
+        [[1.0 if nome in achados else 0.0 for nome in _SIGNAL_NAMES] for achados in disparos]
+    )
+
+
+def build_hybrid_pipeline(drop_link: bool = False) -> Pipeline:
+    """TF-IDF somado aos oito sinais do baseline, na mesma regressão logística.
+
+    Herda o otimismo do baseline: os oito sinais foram desenhados olhando a base
+    inteira, então não são independentes do conjunto em que o híbrido é avaliado.
+    """
+    preprocessor = (lambda t: drop_link_marker(normalize_text(t))) if drop_link else normalize_text
+    return Pipeline(
+        [
+            (
+                "atributos",
+                FeatureUnion(
+                    [
+                        (
+                            "tfidf",
+                            TfidfVectorizer(
+                                preprocessor=preprocessor,
+                                lowercase=False,
+                                ngram_range=(1, 2),
+                                min_df=1,
+                            ),
+                        ),
+                        ("sinais", FunctionTransformer(signal_features, validate=False)),
+                    ]
+                ),
+            ),
+            (
+                "modelo",
+                LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42),
+            ),
+        ]
+    )
+
+
+def out_of_fold_predictions(
+    messages: pd.DataFrame, drop_link: bool = False, hybrid: bool = False
+) -> pd.DataFrame:
     """Probabilidade de golpe para cada mensagem real, prevista fora da própria dobra."""
     real = messages[messages["origem"] == "real"]
+    construir = build_hybrid_pipeline if hybrid else build_pipeline
     linhas = []
     for grupo in sorted(real["grupo"].unique()):
         treino = messages[messages["grupo"] != grupo]
         teste = real[real["grupo"] == grupo]
-        pipeline = build_pipeline(drop_link).fit(treino["texto"], treino["rotulo"])
+        pipeline = construir(drop_link).fit(treino["texto"], treino["rotulo"])
         indice_golpe = list(pipeline.classes_).index(POSITIVE)
         proba = pipeline.predict_proba(teste["texto"])[:, indice_golpe]
         linhas.append(teste.assign(proba=proba))
@@ -236,6 +288,50 @@ def save_confusion_matrix(oof: pd.DataFrame, previsto: pd.Series, destino, titul
     plt.close(figura)
 
 
+# Critério de escolha do app, fixado ANTES de medir as configurações: entre as que
+# produzem no máximo este tanto de alarme falso, vence a que detecta mais golpes de
+# SMS; empate se decide pelo recall geral e depois pelo F1.
+MAX_FALSE_POSITIVES = 10
+
+
+def _candidate(nome: str, oof: pd.DataFrame, previsto: pd.Series) -> dict:
+    relatorio = _full_report(oof, previsto)
+    sms = relatorio["recall_por_origem"].get("SMS e alertas", {"reconhecidos": 0, "golpes": 0})
+    return {
+        "configuracao": nome,
+        "precisao": relatorio["precisao"],
+        "recall": relatorio["recall"],
+        "f1": relatorio["f1"],
+        "alarmes_falsos": relatorio["contagens"]["fp"],
+        "golpes_de_sms": sms["reconhecidos"],
+        "golpes_de_sms_total": sms["golpes"],
+        "tipos_reconhecidos": relatorio["tipos_nao_vistos"]["reconhecidos"],
+        "tipos": relatorio["tipos_nao_vistos"]["tipos"],
+    }
+
+
+def choose_for_app(candidatos: list[dict]) -> dict:
+    """Aplica o critério fixado antes de medir e devolve a escolha, com o porquê."""
+    elegiveis = [c for c in candidatos if c["alarmes_falsos"] <= MAX_FALSE_POSITIVES]
+    if not elegiveis:
+        return {"escolhida": "baseline", "motivo": "nenhuma configuração ficou dentro do limite"}
+    vencedora = max(elegiveis, key=lambda c: (c["golpes_de_sms"], c["recall"], c["f1"]))
+    return {
+        "criterio": (
+            f"no máximo {MAX_FALSE_POSITIVES} alarmes falsos; entre essas, mais golpes de "
+            "SMS detectados; empate pelo recall geral e depois pelo F1"
+        ),
+        "criterio_definido": "antes de medir as configurações",
+        "elegiveis": [c["configuracao"] for c in elegiveis],
+        "fora_do_limite": [
+            c["configuracao"] for c in candidatos if c["alarmes_falsos"] > MAX_FALSE_POSITIVES
+        ],
+        "escolhida": vencedora["configuracao"],
+        "golpes_de_sms": f"{vencedora['golpes_de_sms']} de {vencedora['golpes_de_sms_total']}",
+        "alarmes_falsos": vencedora["alarmes_falsos"],
+    }
+
+
 def _full_report(oof: pd.DataFrame, previsto: pd.Series) -> dict:
     return {
         **evaluate(oof["rotulo"], previsto),
@@ -253,6 +349,30 @@ def run() -> tuple[dict, pd.DataFrame]:
     oof_sem_link = out_of_fold_predictions(mensagens, drop_link=True)
     previsto_sem_link = _as_prediction(oof_sem_link, DEFAULT_THRESHOLD)
 
+    oof_hibrido = out_of_fold_predictions(mensagens, hybrid=True)
+    baseline_previsto = oof["texto"].map(baseline_predict)
+
+    # Combinação: golpe se o baseline ou o modelo no limiar do app marcar.
+    modelo_app = _as_prediction(oof, APP_THRESHOLD)
+    uniao = pd.Series(
+        [
+            POSITIVE if POSITIVE in (b, m) else "legitima"
+            for b, m in zip(baseline_previsto, modelo_app, strict=True)
+        ],
+        index=oof.index,
+    )
+
+    configuracoes = {
+        "baseline": (oof, baseline_previsto),
+        "modelo 0,50": (oof, previsto),
+        "modelo 0,45": (oof, modelo_app),
+        "modelo sem LINK 0,50": (oof_sem_link, previsto_sem_link),
+        "hibrido 0,50": (oof_hibrido, _as_prediction(oof_hibrido, DEFAULT_THRESHOLD)),
+        "hibrido 0,45": (oof_hibrido, _as_prediction(oof_hibrido, APP_THRESHOLD)),
+        "baseline ou modelo 0,45": (oof, uniao),
+    }
+    candidatos = [_candidate(nome, *par) for nome, par in configuracoes.items()]
+
     limiares = threshold_table(oof)
 
     metricas = {
@@ -269,6 +389,10 @@ def run() -> tuple[dict, pd.DataFrame]:
         "modelo": _full_report(oof, previsto),
         "modelo_sem_link": _full_report(oof_sem_link, previsto_sem_link),
         "baseline": baseline_on_same_rows(oof),
+        "hibrido": _full_report(oof_hibrido, _as_prediction(oof_hibrido, APP_THRESHOLD)),
+        "combinacao": _full_report(oof, uniao),
+        "configuracoes_testadas": candidatos,
+        "escolha_do_app": choose_for_app(candidatos),
         "limiares_fora_da_dobra": limiares.to_dict(orient="records"),
         "limiar_do_app": {
             "limiar": APP_THRESHOLD,
@@ -305,13 +429,9 @@ def main() -> None:
     )
 
     with pd.ExcelWriter(REPORTS_DIR / "metricas.xlsx") as excel:
-        pd.DataFrame(
-            [
-                {"metrica": "precisao", **_por_abordagem(metricas, "precisao")},
-                {"metrica": "recall", **_por_abordagem(metricas, "recall")},
-                {"metrica": "f1", **_por_abordagem(metricas, "f1")},
-            ]
-        ).to_excel(excel, sheet_name="resumo", index=False)
+        pd.DataFrame(metricas["configuracoes_testadas"]).to_excel(
+            excel, sheet_name="configuracoes", index=False
+        )
         pd.DataFrame(metricas["limiares_fora_da_dobra"]).to_excel(
             excel, sheet_name="limiares", index=False
         )
@@ -322,27 +442,10 @@ def main() -> None:
             ]
         ).to_excel(excel, sheet_name="recall por origem", index=False)
 
-    resumo = pd.DataFrame(
-        [
-            {"abordagem": nome, **{k: metricas[chave][k] for k in ("precisao", "recall", "f1")}}
-            for nome, chave in (
-                ("baseline", "baseline"),
-                ("modelo", "modelo"),
-                ("modelo sem LINK", "modelo_sem_link"),
-                ("modelo no limiar do app", "limiar_do_app"),
-            )
-        ]
-    )
-    print(resumo.to_string(index=False))
+    print(pd.DataFrame(metricas["configuracoes_testadas"]).to_string(index=False))
+    print()
+    print(json.dumps(metricas["escolha_do_app"], ensure_ascii=False, indent=2))
     print(f"\nmétricas em {REPORTS_DIR}")
-
-
-def _por_abordagem(metricas: dict, chave: str) -> dict:
-    return {
-        "baseline": metricas["baseline"][chave],
-        "modelo": metricas["modelo"][chave],
-        "modelo sem LINK": metricas["modelo_sem_link"][chave],
-    }
 
 
 if __name__ == "__main__":
