@@ -131,14 +131,14 @@
   },
   "baseline": {
     "limiar_de_sinais": 2,
-    "precisao": 0.85,
+    "precisao": 0.836,
     "recall": 0.895,
-    "f1": 0.872,
+    "f1": 0.864,
     "contagens": {
       "vp": 51,
-      "fp": 9,
+      "fp": 10,
       "fn": 6,
-      "vn": 33
+      "vn": 32
     },
     "mensagens": 99,
     "por_grupo": {
@@ -150,9 +150,9 @@
       },
       "legitima": {
         "grupos": 29,
-        "acerto_medio": 0.776,
-        "desvio": 0.385,
-        "grupos_sem_nenhum_acerto": 5
+        "acerto_medio": 0.741,
+        "desvio": 0.407,
+        "grupos_sem_nenhum_acerto": 6
       }
     },
     "recall_por_origem": {
@@ -178,14 +178,14 @@
     }
   },
   "hibrido": {
-    "precisao": 0.84,
+    "precisao": 0.824,
     "recall": 0.737,
-    "f1": 0.785,
+    "f1": 0.778,
     "contagens": {
       "vp": 42,
-      "fp": 8,
+      "fp": 9,
       "fn": 15,
-      "vn": 34
+      "vn": 33
     },
     "mensagens": 99,
     "por_grupo": {
@@ -197,9 +197,9 @@
       },
       "legitima": {
         "grupos": 29,
-        "acerto_medio": 0.793,
-        "desvio": 0.383,
-        "grupos_sem_nenhum_acerto": 5
+        "acerto_medio": 0.759,
+        "desvio": 0.407,
+        "grupos_sem_nenhum_acerto": 6
       }
     },
     "recall_por_origem": {
@@ -228,14 +228,14 @@
     }
   },
   "combinacao": {
-    "precisao": 0.775,
+    "precisao": 0.764,
     "recall": 0.965,
-    "f1": 0.859,
+    "f1": 0.853,
     "contagens": {
       "vp": 55,
-      "fp": 16,
+      "fp": 17,
       "fn": 2,
-      "vn": 26
+      "vn": 25
     },
     "mensagens": 99,
     "por_grupo": {
@@ -247,9 +247,9 @@
       },
       "legitima": {
         "grupos": 29,
-        "acerto_medio": 0.621,
-        "desvio": 0.467,
-        "grupos_sem_nenhum_acerto": 10
+        "acerto_medio": 0.586,
+        "desvio": 0.475,
+        "grupos_sem_nenhum_acerto": 11
       }
     },
     "recall_por_origem": {
@@ -274,10 +274,10 @@
   "configuracoes_testadas": [
     {
       "configuracao": "baseline",
-      "precisao": 0.85,
+      "precisao": 0.836,
       "recall": 0.895,
-      "f1": 0.872,
-      "alarmes_falsos": 9,
+      "f1": 0.864,
+      "alarmes_falsos": 10,
       "golpes_de_sms": 14,
       "golpes_de_sms_total": 17,
       "tipos_reconhecidos": 24,
@@ -318,21 +318,21 @@
     },
     {
       "configuracao": "hibrido 0,50",
-      "precisao": 0.854,
-      "recall": 0.719,
-      "f1": 0.781,
+      "precisao": 0.857,
+      "recall": 0.737,
+      "f1": 0.792,
       "alarmes_falsos": 7,
       "golpes_de_sms": 11,
       "golpes_de_sms_total": 17,
-      "tipos_reconhecidos": 20,
+      "tipos_reconhecidos": 21,
       "tipos": 26
     },
     {
       "configuracao": "hibrido 0,45",
-      "precisao": 0.84,
+      "precisao": 0.824,
       "recall": 0.737,
-      "f1": 0.785,
-      "alarmes_falsos": 8,
+      "f1": 0.778,
+      "alarmes_falsos": 9,
       "golpes_de_sms": 11,
       "golpes_de_sms_total": 17,
       "tipos_reconhecidos": 21,
@@ -340,10 +340,10 @@
     },
     {
       "configuracao": "baseline ou modelo 0,45",
-      "precisao": 0.775,
+      "precisao": 0.764,
       "recall": 0.965,
-      "f1": 0.859,
-      "alarmes_falsos": 16,
+      "f1": 0.853,
+      "alarmes_falsos": 17,
       "golpes_de_sms": 16,
       "golpes_de_sms_total": 17,
       "tipos_reconhecidos": 26,
@@ -366,7 +366,7 @@
     ],
     "escolhida": "baseline",
     "golpes_de_sms": "14 de 17",
-    "alarmes_falsos": 9
+    "alarmes_falsos": 10
   },
   "limiares_fora_da_dobra": [
     {

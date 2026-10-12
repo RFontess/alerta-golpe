@@ -38,6 +38,21 @@ def test_tratamento_generico_nao_e_sinal_de_golpe():
     assert signals("Prezado Cliente, sua fatura está disponível") == []
 
 
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "evite o bloqueio imediato",
+        "bloqueie seu cartao",
+        "sua conta sera bloqueada",
+        "seu acesso foi bloqueado",
+        "vamos bloquear sua conta",
+    ],
+)
+def test_ameaca_pega_as_formas_de_bloqueio(texto):
+    # O radical era "bloquei", que deixava passar "bloqueada" e "bloqueado".
+    assert "ameaca" in signals(texto)
+
+
 def test_sinais_acentuados_sao_reconhecidos():
     # Os padrões rodam sobre o texto normalizado, sem acento.
     assert "ameaca" in signals("conta com restrição e pendência")

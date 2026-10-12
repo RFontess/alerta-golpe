@@ -31,7 +31,9 @@ SIGNALS: tuple[tuple[str, str], ...] = (
         r"urgente|imediat|agora|hoje|ultimo aviso|prazo|vence|nao perca|limitad"
         r"|24 horas|ainda hoje|em breve",
     ),
-    ("ameaca", r"bloquei|suspens|cancelad|irregular|pendencia|divida|judicial|restricao|evite"),
+    # "bloque" e não "bloquei": o radical com i só pegava "bloqueio" e "bloqueie", e
+    # deixava passar "bloqueada", que é como o SMS de golpe costuma escrever.
+    ("ameaca", r"bloque|suspens|cancelad|irregular|pendencia|divida|judicial|restricao|evite"),
     ("link", r"<LINK>"),
     ("valor", r"<VALOR>"),
     ("pix", r"\bpix\b"),
