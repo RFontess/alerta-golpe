@@ -8,13 +8,13 @@ Uso: python -m alerta_golpe.review
 """
 
 import re
-from pathlib import Path
 
 import pandas as pd
 
+from alerta_golpe.paths import DATA_DIR
 from alerta_golpe.preprocessing import anonymize
 
-PRIVATE_DIR = Path("data/private")
+PRIVATE_DIR = DATA_DIR / "private"
 
 # O que não deveria sobrar depois da anonimização.
 _SUSPECTS = {

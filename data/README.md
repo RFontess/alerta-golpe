@@ -35,23 +35,29 @@ No repositório (`data/raw/mensagens.csv`), 99 mensagens:
 | legitima | real | 42 | 29 |
 | legitima | sintetica | 40 | 19 |
 
-Depois de rodar `python -m alerta_golpe.sources`, que baixa os datasets externos,
-150 mensagens:
+Com os datasets externos baixados, `load_messages()` entrega 139 mensagens:
 
 | rótulo | origem | mensagens | grupos |
 | --- | --- | --- | --- |
-| golpe | real | 68 | 26 |
+| golpe | real | 57 | 26 |
 | legitima | real | 42 | 29 |
 | legitima | sintetica | 40 | 19 |
 
-Por categoria, entre os 68 golpes: phishing 36, anúncio falso 15, Pix 9, boleto
+Os datasets externos trazem 51 golpes, mas 11 somem na remoção de duplicadas: as 20
+variações do Auxílio Brasil só diferiam no endereço, e com `<LINK>` no lugar dele
+viram o mesmo texto. É o efeito esperado, e mostra por que a contagem que importa é
+a de grupos.
+
+Por categoria, entre os 57 golpes: phishing 26, anúncio falso 14, Pix 9, boleto
 falso 3, engenharia social 2, WhatsApp 2, falsa central 1.
+
+O teste usa só `origem = real`: 57 golpes em 26 grupos contra 42 legítimas em 29.
 
 ## Fontes, por rótulo
 
 | rótulo | fonte | mensagens |
 | --- | --- | --- |
-| golpe | datasets FraudTelegram.Br e FraudWhatsApp.Br | 51 |
+| golpe | datasets FraudTelegram.Br e FraudWhatsApp.Br | 40 |
 | golpe | boatos.org (checagem, texto do print) | 15 |
 | golpe | sosgolpe.com.br | 2 |
 | legitima | e-mail próprio do autor, anonimizado | 42 |
@@ -103,16 +109,17 @@ Limites conhecidos da anonimização:
   texto de propósito: no lugar do nome da pessoa, são sinal de golpe.
 - CPF sem pontuação tem onze dígitos, igual a celular com DDD, e sai como
   `<TELEFONE>`. O dado não vaza; o marcador é que fica errado.
-- Depois de anonimizar, 4 mensagens ficaram idênticas a outras (só mudava o código
-  ou o valor) e foram removidas como duplicadas.
+- Depois de anonimizar, mensagens que só diferiam no código, no valor ou no
+  endereço ficam idênticas e são removidas como duplicadas: 4 no CSV do
+  repositório e 11 dos golpes externos.
 
 ## Sinais por rótulo
 
-Proporção de mensagens que contêm cada sinal, sobre as 150:
+Proporção de mensagens que contêm cada sinal, sobre as 139:
 
 | rótulo | n | `<LINK>` | `<VALOR>` | `<CODIGO>` | `<TELEFONE>` | instituição | tratamento genérico |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| golpe | 68 | 69% | 53% | 7% | 1% | 28% | 10% |
+| golpe | 57 | 63% | 49% | 9% | 2% | 32% | 12% |
 | legitima | 82 | 17% | 12% | 11% | 0% | 9% | 6% |
 
 ## Adaptação de canal
@@ -151,7 +158,7 @@ viaja melhor para o uso real.
 
 **As duas classes vêm de origens diferentes, e isso contamina a comparação.** Os
 golpes são SMS e mensagem de grupo; as legítimas reais são e-mail. O caso mais sério
-é o link: 69% dos golpes têm URL escrita no meio da mensagem, contra 17% das
+é o link: 63% dos golpes têm URL escrita no meio da mensagem, contra 17% das
 legítimas. O modelo pode aprender "link igual a golpe", que é atalho de formato e não
 de conteúdo — e erraria numa notificação legítima de entrega, que no celular real vem
 com link. A [adaptação de canal](#adaptação-de-canal) corrige parte disso e leva 6

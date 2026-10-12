@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from alerta_golpe.paths import DATA_DIR
+
 REPOSITORY = "https://github.com/jmmfilho/sec-fraudimabr"
 CITATION = (
     "Filho, J. M. M. et al. FraudTelegram.Br e FraudWhatsApp.Br: datasets de fraude "
@@ -31,7 +33,7 @@ _FILES = {
     "whatsapp": "df_rotulado_whatsapp.csv",
 }
 
-EXTERNAL_DIR = Path("data/external")
+EXTERNAL_DIR = DATA_DIR / "external"
 
 # Cada modelo de mensagem é um grupo: as variações só mudam o link ou o valor, então
 # a divisão entre treino e teste tem que manter o grupo inteiro de um lado só.
