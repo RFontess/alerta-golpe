@@ -24,6 +24,8 @@ O app está publicado em <https://alerta-golpe.streamlit.app>. Cole uma mensagem
 ou clique num dos três exemplos prontos, um de cada nível, que preenchem a caixa de uma
 vez.
 
+![O app analisando uma mensagem de exemplo, com o nível, os sinais e a dica](docs/demo.gif)
+
 ## Em resumo
 
 - O que faz: a pessoa cola uma mensagem e o app diz se ela tem sinais de golpe, mostra
