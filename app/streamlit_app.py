@@ -16,11 +16,12 @@ O resultado aparece logo abaixo do botão "Verificar", e os exemplos ficam num e
 fechado acima da caixa: no celular, qualquer coisa entre o botão e o resultado empurra o
 resultado para fora da tela.
 
-O app não importa nada de treino e não lê a base: só chama `explain`.
+O app não importa nada de treino e não lê a base: chama `explain` e o monitoramento.
 """
 
 import streamlit as st
 
+from alerta_golpe import monitoring
 from alerta_golpe.explain import (
     ANONYMIZATION_NOTE,
     RULE_TEXT,
@@ -40,10 +41,29 @@ EXAMPLES: tuple[tuple[str, str], ...] = (
     ("Exemplo sem sinais", "Oi, cheguei bem em casa. Te ligo mais tarde."),
 )
 
+EXAMPLE_TEXTS = frozenset(texto for _, texto in EXAMPLES)
+
 FOOTER = (
     "Protótipo de estudo. Não substitui confirmar com o banco pelos canais oficiais. "
-    "O texto da mensagem não é guardado."
+    "O texto da mensagem não é guardado. Guardamos só o resultado e a sua resposta, "
+    "para medir o protótipo."
 )
+
+FEEDBACK_QUESTION = "Se você já sabe, conte para a gente:"
+
+FEEDBACK_THANKS = "Obrigado. Sua resposta ajuda a medir o protótipo."
+
+# O banco guarda o vocabulário sem acento, igual ao dos sinais do baseline. A tela
+# acentua; o que não estiver aqui aparece como está gravado.
+ACCENTED_NAMES: dict[str, str] = {
+    "medio": "médio",
+    "nao era golpe": "não era golpe",
+    "urgencia": "urgência",
+    "ameaca": "ameaça",
+    "pix": "Pix",
+    "beneficio ou premio": "benefício ou prêmio",
+    "credito para negativado": "crédito para negativado",
+}
 
 EMPTY_WARNING = "Cole a mensagem na caixa acima antes de clicar em Verificar."
 
@@ -58,20 +78,43 @@ CSS = """
     .stApp textarea { font-size: 20px; line-height: 1.5; }
     .stApp button { font-size: 20px; padding: 0.7em 1.2em; }
     .stApp [data-testid="stAlert"] p { font-size: 22px; }
+    .stApp [data-testid="stCaptionContainer"] p { font-size: 16px; }
 </style>
 """
 
 MESSAGE_KEY = "mensagem"
 RESULT_KEY = "resultado"
+CHECK_ID_KEY = "verificacao"
+ANSWERED_KEY = "respondeu"
+
+MONITORING_PAGE = "monitoramento"
+
+
+def _accented(nome: str) -> str:
+    return ACCENTED_NAMES.get(nome, nome)
 
 
 def _clear_result() -> None:
     """Editar a mensagem apaga o resultado: nunca mostrar a resposta de outro texto."""
-    st.session_state.pop(RESULT_KEY, None)
+    for chave in (RESULT_KEY, CHECK_ID_KEY, ANSWERED_KEY):
+        st.session_state.pop(chave, None)
 
 
 def _check(mensagem: str) -> None:
-    st.session_state[RESULT_KEY] = explain(mensagem)
+    resultado = explain(mensagem)
+    st.session_state[RESULT_KEY] = resultado
+    st.session_state[CHECK_ID_KEY] = monitoring.record(
+        resultado.anonymized,
+        resultado.level,
+        [sinal.name for sinal in resultado.signals],
+        from_example=mensagem in EXAMPLE_TEXTS,
+    )
+    st.session_state.pop(ANSWERED_KEY, None)
+
+
+def _answer(resposta: str) -> None:
+    monitoring.answer(st.session_state[CHECK_ID_KEY], resposta)
+    st.session_state[ANSWERED_KEY] = True
 
 
 def _use_example(texto: str) -> None:
@@ -108,6 +151,24 @@ def _show_details(resultado: Explanation) -> None:
         st.text(resultado.anonymized)
 
 
+def _show_feedback() -> None:
+    if st.session_state.get(ANSWERED_KEY):
+        st.markdown(FEEDBACK_THANKS)
+        return
+    st.markdown(FEEDBACK_QUESTION)
+    esquerda, direita = st.columns(2)
+    esquerda.button(
+        "Era golpe", key="era-golpe", on_click=_answer, args=("era golpe",), width="stretch"
+    )
+    direita.button(
+        "Não era golpe",
+        key="nao-era-golpe",
+        on_click=_answer,
+        args=("nao era golpe",),
+        width="stretch",
+    )
+
+
 def _show_result(resultado: Explanation) -> None:
     _show_level(resultado)
     st.markdown(resultado.message)
@@ -116,6 +177,7 @@ def _show_result(resultado: Explanation) -> None:
     st.markdown(resultado.category_tip)
     st.markdown(resultado.general_tip)
     _show_details(resultado)
+    _show_feedback()
 
 
 def _show_examples() -> None:
@@ -150,6 +212,51 @@ def check_page() -> None:
 
     st.divider()
     st.markdown(FOOTER)
+    st.caption(f"[Monitoramento do protótipo](?pagina={MONITORING_PAGE})")
+
+
+def monitoring_page() -> None:
+    st.title("Monitoramento")
+    st.markdown("Quantas verificações o protótipo já fez e o que as pessoas responderam.")
+
+    resumo = monitoring.summary()
+    if not resumo["verificacoes"]:
+        st.markdown("Nenhuma verificação registrada ainda.")
+        st.markdown("[Voltar](?)")
+        return
+
+    uma, duas, tres = st.columns(3)
+    uma.metric("Verificações", resumo["verificacoes"])
+    duas.metric("Mensagens coladas", resumo["mensagens_coladas"])
+    tres.metric("Exemplos", resumo["exemplos"])
+
+    st.markdown("**Por nível:**")
+    for nivel, quantas in resumo["por_nivel"].items():
+        st.markdown(f"- {_accented(nivel)}: {quantas}")
+
+    st.markdown("**Por sinal:**")
+    if resumo["por_sinal"]:
+        for nome, quantas in resumo["por_sinal"].items():
+            st.markdown(f"- {_accented(nome)}: {quantas}")
+    else:
+        st.markdown("- nenhum sinal disparado ainda")
+
+    st.markdown("**Respostas por nível:**")
+    if resumo["respostas_por_nivel"]:
+        for nivel, respostas in resumo["respostas_por_nivel"].items():
+            detalhe = ", ".join(f"{_accented(r)}: {q}" for r, q in respostas.items())
+            st.markdown(f"- {_accented(nivel)}: {detalhe}")
+    else:
+        st.markdown("- ninguém respondeu ainda")
+
+    st.download_button(
+        "Baixar o histórico em Excel",
+        data=monitoring.history_excel(),
+        file_name="monitoramento.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.divider()
+    st.markdown("[Voltar](?)")
 
 
 def main() -> None:
@@ -159,7 +266,10 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
     st.markdown(CSS, unsafe_allow_html=True)
-    check_page()
+    if st.query_params.get("pagina") == MONITORING_PAGE:
+        monitoring_page()
+    else:
+        check_page()
 
 
 main()
