@@ -113,7 +113,33 @@ Proporção de mensagens que contêm cada sinal, sobre as 150:
 | rótulo | n | `<LINK>` | `<VALOR>` | `<CODIGO>` | `<TELEFONE>` | instituição | tratamento genérico |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | golpe | 68 | 69% | 53% | 7% | 1% | 28% | 10% |
-| legitima | 82 | 10% | 12% | 11% | 0% | 9% | 6% |
+| legitima | 82 | 17% | 12% | 11% | 0% | 9% | 6% |
+
+## Adaptação de canal
+
+Os e-mails legítimos chegaram **sem URL nenhuma**: 0 dos 45 originais tinham link no
+corpo, porque o endereço estava atrás de botão HTML, que a exportação do texto
+perdeu. Num SMS, o mesmo aviso traria o endereço escrito no meio da mensagem.
+
+Para o teste não ficar com 0% de legítima com link, em **6 mensagens de 5 grupos**
+onde o e-mail tinha botão clicável foi inserido `<LINK>` junto da chamada:
+
+| grupo | chamada onde o marcador entrou |
+| --- | --- |
+| `oferta-de-credito-apos-mudanca-no-score-serasa` | "conferir suas possibilidades no Serasa Crédito?" |
+| `compra-entregue-mercado-livre` | "devolver ou trocar grátis sua compra até 27 de setembro." |
+| `pedido-enviado-com-rastreio-tiktok-shop` (2) | "Envio padrão: `<CODIGO>`" |
+| `falha-no-pagamento-da-assinatura-chatgpt-plus` | "Atualizar pagamento" |
+| `assinatura-pausada-por-falta-de-pagamento-claude` | "pague a fatura pendente." |
+
+Só entrou onde havia botão de verdade. Ficaram **sem** marcador, de propósito, as que
+parecem ter chamada mas não têm link: "conferir os detalhes no PDF anexo aqui no
+e-mail" (Nubank, é anexo), "Simule na loja!" (Renner, é loja física), "analisar as
+informações abaixo" (Microsoft, aponta para o corpo do e-mail) e a segunda entrega do
+Mercado Livre, que só avisa que a compra chegou.
+
+Nenhuma outra palavra foi acrescentada: o texto segue sendo o da mensagem recebida,
+com o marcador posto onde o endereço estaria no SMS.
 
 ## Limitações
 
@@ -125,20 +151,20 @@ viaja melhor para o uso real.
 
 **As duas classes vêm de origens diferentes, e isso contamina a comparação.** Os
 golpes são SMS e mensagem de grupo; as legítimas reais são e-mail. O caso mais sério
-é o link: **nenhum** dos 42 e-mails legítimos tem URL no texto, porque o link estava
-atrás de botão HTML e não sobreviveu à exportação, enquanto 69% dos golpes têm URL
-escrita no meio da mensagem. O modelo pode aprender "link igual a golpe", que é
-atalho de formato e não de conteúdo — e erraria numa notificação legítima de entrega,
-que no celular real vem com link. As legítimas com link nesta base são **todas
-sintéticas**, então essa correção ajuda o treino mas **não entra no teste**. Na
-avaliação, medir também o desempenho sem o token `<LINK>`, para saber quanto o modelo
-depende dele.
+é o link: 69% dos golpes têm URL escrita no meio da mensagem, contra 17% das
+legítimas. O modelo pode aprender "link igual a golpe", que é atalho de formato e não
+de conteúdo — e erraria numa notificação legítima de entrega, que no celular real vem
+com link. A [adaptação de canal](#adaptação-de-canal) corrige parte disso e leva 6
+legítimas **reais** com link para dentro do teste, mas a diferença entre as classes
+continua grande. Na avaliação, medir também o desempenho **sem os sinais de canal**,
+`<LINK>` incluído, para saber quanto o modelo depende deles.
 
 **O que ficou fora do teste.** O teste usa só `origem = real`, então ficam fora:
 
-- conversa pessoal do dia a dia (40 exemplos sintéticos, 19 grupos), inclusive os
-  casos difíceis de Pix entre amigos e cobrança informal entre conhecidos;
-- legítima com link, pelo motivo acima.
+- conversa pessoal do dia a dia (32 exemplos sintéticos), inclusive os casos
+  difíceis de Pix entre amigos e cobrança informal entre conhecidos;
+- as 8 legítimas sintéticas que já nasceram com link, criadas para o treino não
+  depender do formato.
 
 Marketing e oferta de crédito **estão** no teste: vieram reais (Serasa, Ticket,
 Netshoes, Livelo, Renner, Pix no crédito do Nubank).
