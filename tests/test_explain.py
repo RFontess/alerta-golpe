@@ -7,6 +7,8 @@ from alerta_golpe.explain import (
     CATEGORY_TIPS,
     FALLBACK_CATEGORY,
     GENERAL_TIP,
+    LEVEL_MESSAGES,
+    LEVEL_TITLES,
     SIGNAL_PHRASES,
     explain,
 )
@@ -69,3 +71,32 @@ def test_toda_categoria_tem_dica(nome):
 
 def test_categoria_cai_no_fallback_quando_nenhuma_bate():
     assert explain("Bom dia, cheguei bem em casa").category == FALLBACK_CATEGORY
+
+
+@pytest.mark.parametrize("nivel", ["alto", "medio", "baixo"])
+def test_todo_nivel_tem_titulo_e_mensagem(nivel):
+    assert LEVEL_TITLES[nivel].strip()
+    assert LEVEL_MESSAGES[nivel].strip()
+
+
+def test_o_titulo_diz_o_nivel_sem_depender_da_cor():
+    assert explain(CRU).title == LEVEL_TITLES["alto"]
+    assert "golpe" in explain(CRU).title
+
+
+def test_nenhum_texto_da_tela_fala_de_endereco():
+    # Para muita gente idosa, endereço é o de casa: na tela é sempre "link".
+    textos = [
+        *SIGNAL_PHRASES.values(),
+        *CATEGORY_TIPS.values(),
+        *LEVEL_TITLES.values(),
+        *LEVEL_MESSAGES.values(),
+        GENERAL_TIP,
+    ]
+    assert all("endereç" not in texto for texto in textos)
+
+
+def test_devolve_o_texto_anonimizado_que_leu():
+    anonimizado = explain(CRU).anonymized
+    assert "<LINK>" in anonimizado and "<VALOR>" in anonimizado
+    assert "bit.ly" not in anonimizado

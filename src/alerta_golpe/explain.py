@@ -12,8 +12,11 @@ As palavras-chave de categoria servem só para escolher a dica. Elas não entram
 decisão, que continua sendo a contagem de sinais do baseline.
 
 O tom dos textos vem do erro medido: a regra deixou passar 6 dos 57 golpes e alertou em
-9 das 42 legítimas. Então nenhuma orientação afirma que a mensagem é golpe ou que é
+10 das 42 legítimas. Então nenhuma orientação afirma que a mensagem é golpe ou que é
 segura, e todas terminam em algo que a pessoa pode fazer: confirmar por outro caminho.
+
+Os textos da tela dizem "link", nunca "endereço": para muita gente idosa, endereço é o
+de casa.
 """
 
 import re
@@ -25,13 +28,13 @@ from alerta_golpe.preprocessing import anonymize, normalize_text
 
 SIGNAL_PHRASES: dict[str, str] = {
     "urgencia": "A mensagem apressa você.",
-    "ameaca": "A mensagem assusta você com um problema na sua conta.",
-    "link": "A mensagem traz um endereço para você abrir.",
+    "ameaca": "A mensagem fala de um problema, como bloqueio, dívida ou cancelamento.",
+    "link": "A mensagem traz um link para você abrir.",
     "valor": "A mensagem fala de dinheiro.",
     "pix": "A mensagem envolve um Pix.",
-    "pedido de dados": "A mensagem pede seus dados.",
+    "pedido de dados": "A mensagem pede seus dados ou pede para você clicar.",
     "beneficio ou premio": "A mensagem promete dinheiro ou vantagem.",
-    "credito para negativado": "A mensagem oferece empréstimo fácil.",
+    "credito para negativado": "A mensagem fala de empréstimo, crédito ou de limpar o nome.",
 }
 
 # Os marcadores da anonimização não são palavras que a pessoa escreveu, então viram
@@ -41,25 +44,41 @@ MARKER_WORDS: dict[str, str] = {
     "<VALOR>": "um valor em dinheiro",
 }
 
+LEVEL_TITLES: dict[str, str] = {
+    "alto": "Cuidado: esta mensagem parece golpe",
+    "medio": "Atenção: um ponto para conferir",
+    "baixo": "Não encontramos sinais comuns de golpe",
+}
+
 LEVEL_MESSAGES: dict[str, str] = {
     "alto": (
-        "Esta mensagem parece golpe. Não clique em nada, não pague e não responda por "
-        "ela. Confirme pelo aplicativo do banco ou pelo número oficial."
+        "Não clique em nada, não pague e não responda por ela. Confirme pelo aplicativo "
+        "do banco ou pelo número oficial."
     ),
     "medio": (
-        "Esta mensagem tem um ponto de atenção. Esse ponto também aparece em mensagens "
-        "normais, então vale olhar com calma antes de responder."
+        "Esse ponto também aparece em mensagens normais. Se a mensagem pedir dinheiro, "
+        "dados ou algum código, confirme pelo aplicativo do banco ou pelo número oficial "
+        "antes."
     ),
-    "baixo": (
-        "Não encontramos sinais comuns de golpe nesta mensagem. Isso não garante que "
-        "ela seja segura."
-    ),
+    "baixo": "Isso não garante que a mensagem seja segura.",
 }
 
 GENERAL_TIP = (
     "Na dúvida, não clique, não pague e não passe nenhum código. Confirme por outro "
     "caminho: ligue para o banco pelo número oficial ou para a pessoa no número que "
     "você já conhece."
+)
+
+RULE_TEXT = (
+    "O Alerta Golpe procura oito sinais na mensagem. Quando encontra dois ou mais, "
+    "mostra o aviso vermelho; com um só, mostra o aviso amarelo; sem nenhum, diz que "
+    "não encontrou sinal. Não há conta de probabilidade: é só a contagem de sinais."
+)
+
+ANONYMIZATION_NOTE = (
+    "Antes de procurar os sinais, o Alerta Golpe troca por etiquetas os dados que "
+    "reconhece: telefone, e-mail, documento, valor, link, código e alguns nomes. É esta "
+    "versão da sua mensagem que ele leu:"
 )
 
 FALLBACK_CATEGORY = "engenharia social"
@@ -92,38 +111,37 @@ CATEGORY_KEYWORDS: tuple[tuple[str, str], ...] = (
 
 CATEGORY_TIPS: dict[str, str] = {
     "whatsapp": (
-        "Ligue para a pessoa no número antigo que você já tem. Não envie dinheiro sem "
-        "ouvir a voz dela."
+        "Ligue para a pessoa no número antigo, que você já tem. Não envie dinheiro antes "
+        "de falar com ela por esse número."
     ),
     "boleto falso": (
-        "Não pague o boleto que chegou por mensagem. Peça outro boleto dentro do "
-        "aplicativo da empresa."
+        "Não pague o boleto que veio na mensagem. Pegue a segunda via no aplicativo da empresa."
     ),
     "cartao": (
         "Não passe o número do seu cartão por mensagem. Ligue para o número que está "
         "escrito no cartão."
     ),
     "falsa central": (
-        "Desligue e ligue você mesmo para o número oficial do banco. Ninguém do banco "
-        "pede a sua senha nem o seu código."
+        "Não ligue para o número da mensagem. Ligue você mesmo para o número oficial do "
+        "banco, que está no cartão. Ninguém do banco pede sua senha ou seu código."
     ),
     "pix": (
         "Não faça o Pix agora. Ligue para a pessoa ou para a empresa no número que você "
         "já tem e confirme."
     ),
     "phishing": (
-        "Não abra o endereço da mensagem. Entre no aplicativo do banco ou da loja pelo "
-        "ícone do seu celular."
+        "Não abra o link da mensagem. Entre no aplicativo do banco ou da loja pelo ícone "
+        "do seu celular."
     ),
     "site falso": (
-        "Não use o endereço da mensagem. Procure a empresa pelo nome ou use o aplicativo dela."
+        "Não abra o link da mensagem. Use o aplicativo da empresa que você já tem no celular."
     ),
     "anuncio falso": (
         "Não pague por uma oferta que chegou por mensagem. Procure o produto na loja que "
         "você já conhece."
     ),
     FALLBACK_CATEGORY: (
-        "Antes de responder, fale com alguém de confiança. Não passe dado nem dinheiro "
+        "Antes de responder, fale com alguém de confiança. Não passe dados nem dinheiro "
         "por mensagem."
     ),
 }
@@ -151,11 +169,13 @@ class Signal:
 @dataclass(frozen=True)
 class Explanation:
     level: str
+    title: str
     message: str
     signals: list[Signal]
     category: str
     category_tip: str
     general_tip: str
+    anonymized: str
 
 
 def _normalized_tokens(text: str) -> tuple[str, list[tuple[str, int, int]]]:
@@ -218,9 +238,11 @@ def explain(texto: str) -> Explanation:
     escolhida = category(anonimizado)
     return Explanation(
         level=nivel,
+        title=LEVEL_TITLES[nivel],
         message=LEVEL_MESSAGES[nivel],
         signals=disparados,
         category=escolhida,
         category_tip=CATEGORY_TIPS[escolhida],
         general_tip=GENERAL_TIP,
+        anonymized=anonimizado,
     )
