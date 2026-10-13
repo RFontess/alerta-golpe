@@ -159,11 +159,11 @@ _EDGE_PUNCTUATION = ".,;:!?\"'()[]{}*…"
 
 @dataclass(frozen=True)
 class Signal:
-    """Um sinal que disparou, com a frase para a pessoa e as palavras que o acionaram."""
+    """Um sinal que disparou, com a frase para a pessoa e os trechos que o acionaram."""
 
     name: str
     phrase: str
-    words: list[str]
+    excerpts: list[str]
 
 
 @dataclass(frozen=True)
@@ -178,36 +178,49 @@ class Explanation:
     anonymized: str
 
 
-def _normalized_tokens(text: str) -> tuple[str, list[tuple[str, int, int]]]:
-    """Texto normalizado e, para cada palavra, a forma original e onde ela ficou.
+def _normalized_tokens(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
+    """Texto normalizado e, para cada palavra, onde ela está no original e no normalizado.
 
-    Normalizar palavra por palavra dá o mesmo resultado que normalizar o texto inteiro,
-    e guarda o trecho original de cada palavra: é assim que a explicação mostra
-    "cancelada" onde a regra casou só com o radical "cancelad".
+    Normalizar palavra por palavra dá o mesmo resultado que normalizar o texto inteiro, e
+    guarda a posição de cada palavra nos dois: é assim que a explicação mostra "cancelada"
+    onde a regra casou só com o radical "cancelad".
     """
-    tokens: list[tuple[str, int, int]] = []
+    tokens: list[tuple[int, int, int, int]] = []
     pieces: list[str] = []
     position = 0
     for match in _WORD.finditer(text):
         normalized = normalize_text(match.group(0))
         if not normalized:
             continue
-        tokens.append((match.group(0), position, position + len(normalized)))
+        tokens.append((match.start(), match.end(), position, position + len(normalized)))
         pieces.append(normalized)
         position += len(normalized) + 1
     return " ".join(pieces), tokens
 
 
-def _words_for(
-    pattern: re.Pattern[str], normalized: str, tokens: list[tuple[str, int, int]]
+def _excerpts_for(
+    pattern: re.Pattern[str],
+    texto: str,
+    normalized: str,
+    tokens: list[tuple[int, int, int, int]],
 ) -> list[str]:
+    """Os trechos do texto que a regra casou, inteiros e sem repetir.
+
+    Cada disparo da regra vira um trecho só, recortado do texto como a pessoa escreveu: a
+    regra de pedido de dados mostra "Atualize seus dados", e não três palavras soltas. A
+    vírgula entre trechos é da tela, não de dentro da frase.
+    """
     found: list[str] = []
     for match in pattern.finditer(normalized):
-        for original, start, end in tokens:
-            if start < match.end() and match.start() < end:
-                word = MARKER_WORDS.get(original, original.strip(_EDGE_PUNCTUATION))
-                if word and word not in found:
-                    found.append(word)
+        cobertos = [
+            token for token in tokens if token[2] < match.end() and match.start() < token[3]
+        ]
+        if not cobertos:
+            continue
+        trecho = texto[cobertos[0][0] : cobertos[-1][1]].strip(_EDGE_PUNCTUATION)
+        trecho = MARKER_WORDS.get(trecho, trecho)
+        if trecho and trecho not in found:
+            found.append(trecho)
     return found
 
 
@@ -231,7 +244,11 @@ def explain(texto: str) -> Explanation:
     anonimizado = anonymize(texto)
     normalizado, tokens = _normalized_tokens(anonimizado)
     disparados = [
-        Signal(name, SIGNAL_PHRASES[name], _words_for(_SIGNAL_PATTERNS[name], normalizado, tokens))
+        Signal(
+            name,
+            SIGNAL_PHRASES[name],
+            _excerpts_for(_SIGNAL_PATTERNS[name], anonimizado, normalizado, tokens),
+        )
         for name in baseline_signals(anonimizado)
     ]
     nivel = level(len(disparados))

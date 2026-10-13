@@ -136,9 +136,9 @@ def _show_signals(resultado: Explanation) -> None:
     st.markdown("**O que chamou atenção:**")
     for sinal in resultado.signals:
         st.markdown(f"- {sinal.phrase}")
-        if sinal.words:
+        if sinal.excerpts:
             # st.text não interpreta Markdown: as palavras vêm da mensagem da pessoa.
-            st.text("    na mensagem: " + ", ".join(sinal.words))
+            st.text("    na mensagem: " + ", ".join(sinal.excerpts))
 
 
 def _show_details(resultado: Explanation) -> None:

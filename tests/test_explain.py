@@ -24,11 +24,30 @@ def test_anonimiza_antes_de_contar_os_sinais():
     assert {"link", "valor"} <= disparados
 
 
+def _excerpts(texto: str) -> dict[str, list[str]]:
+    return {sinal.name: sinal.excerpts for sinal in explain(texto).signals}
+
+
 def test_mostra_a_palavra_inteira_e_nao_o_radical_da_regra():
-    por_nome = {sinal.name: sinal.words for sinal in explain(CRU).signals}
+    por_nome = _excerpts(CRU)
     assert por_nome["ameaca"] == ["cancelada"]
     assert por_nome["link"] == ["um link"]
     assert por_nome["valor"] == ["um valor em dinheiro"]
+
+
+def test_mostra_o_trecho_inteiro_quando_a_regra_casa_varias_palavras():
+    # A regra casa "atualize seus dados"; a tela mostra a frase, não palavra por palavra.
+    assert _excerpts("Atualize seus dados hoje")["pedido de dados"] == ["Atualize seus dados"]
+
+
+def test_a_virgula_separa_trechos_diferentes_do_mesmo_sinal():
+    por_nome = _excerpts("Urgente: a fatura vence hoje")
+    assert por_nome["urgencia"] == ["Urgente", "vence", "hoje"]
+
+
+def test_o_trecho_sai_como_a_pessoa_escreveu():
+    # Acento e maiúscula do original, sem a pontuação das pontas.
+    assert _excerpts("Clique aqui, é rápido")["pedido de dados"] == ["Clique aqui"]
 
 
 @pytest.mark.parametrize(
